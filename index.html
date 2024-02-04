@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>История изменений договора</title>
+    <script src="https://unpkg.com/@gitgraph/js"></script>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/gitgraph.js/dist/gitgraph.min.css">
+    <style>
+        #userInput input {
+            width: 300px; /* Увеличенный размер полей ввода */
+            margin: 5px;
+            padding: 10px;
+            font-size: 16px; /* Более крупный размер шрифта */
+        }
+
+        #gitGraphContainer {
+            height: 600px;
+            border: 1px solid #ccc;
+            float: left;
+            width: 68%; /* Уменьшение ширины для выделения места под список коммитов */
+        }
+
+        #commitList {
+            float: right;
+            width: 30%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            overflow: auto; /* Добавление прокрутки если список слишком длинный */
+            max-height: 600px; /* Ограничение высоты списка */
+        }
+    </style>
+</head>
+<body>
+    <div id="userInput">
+        <input type="text" id="personalAccessToken" placeholder="Введите ваш Personal Access Token здесь" />
+        <input type="text" id="owner" placeholder="Введите имя владельца репозитория" />
+        <input type="text" id="repo" placeholder="Введите имя репозитория" />
+        <button id="loadCommitsButton">Загрузить коммиты</button>
+    </div>
+    <div id="gitGraphContainer"></div>
+    <div id="commitList"></div>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            let gitGraph;
+
+            function createGitGraph() {
+                const container = document.getElementById("gitGraphContainer");
+                container.innerHTML = '';
+                gitGraph = new GitgraphJS.createGitgraph(container, {
+                    orientation: "vertical"
+                });
+                return gitGraph;
+            }
+
+            function fetchCommits() {
+                const token = document.getElementById('personalAccessToken').value;
+                const owner = document.getElementById('owner').value;
+                const repo = document.getElementById('repo').value;
+                const commitList = document.getElementById('commitList');
+                commitList.innerHTML = ''; // Очищаем список коммитов
+
+                if (!token || !owner || !repo) {
+                    alert('Пожалуйста, введите Personal Access Token, имя владельца и имя репозитория.');
+                    return;
+                }
+
+                gitGraph = createGitGraph();
+
+                fetch(`https://api.github.com/repos/${owner}/${repo}/commits`, {
+                    headers: {
+                        Authorization: `token ${token}`
+                    }
+                })
+                .then(response => response.json())
+                .then(commits => {
+                    gitGraph.clear(); // Очистка предыдущих коммитов
+
+                    // Создание ветки main и добавление коммитов
+                    const main = gitGraph.branch("main");
+
+                    commits.forEach(commit => {
+                        const commitSubject = commit.commit.message;
+                        main.commit({
+                            subject: commitSubject,
+                            sha1: commit.sha,
+                            author: commit.commit.author.name
+                        });
+
+                        // Добавляем коммиты в боковую панель с ссылками на коммиты
+                        const listItem = document.createElement("li");
+                        const commitLink = document.createElement("a");
+                        commitLink.href = commit.html_url;
+                        commitLink.textContent = commitSubject;
+                        listItem.appendChild(commitLink);
+                        commitList.appendChild(listItem);
+                    });
+                })
+                .catch(error => {
+                    console.error("Ошибка при получении данных о коммитах: ", error);
+                });
+            }
+
+            const loadCommitsButton = document.getElementById('loadCommitsButton');
+            loadCommitsButton.addEventListener('click', fetchCommits);
+        });
+    </script>
+</body>
+</html>
